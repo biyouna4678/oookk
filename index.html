@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>iOS 20 Home Screen</title>
+
+  <!-- High-Speed Mirrors (Mainland China Optimized) -->
+  
+  <!-- Tailwind CSS 2.2.19 (Note: Changed .js to .css to prevent syntax errors as v2 is a stylesheet) -->
+  <link rel="stylesheet" href="https://lib.baomitu.com/tailwindcss/2.2.19/tailwind.min.css">
+  
+  <!-- Vue 3 -->
+  <script src="https://lib.baomitu.com/vue/3.3.4/vue.global.prod.js"></script>
+  
+  <!-- SortableJS for Drag & Drop -->
+  <script src="https://lib.baomitu.com/Sortable/1.15.0/Sortable.min.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://lib.baomitu.com/lucide/0.263.0/lucide.min.js"></script>
+
+  <!-- Custom CSS to preserve visual polish without Tailwind v3 JIT compiler -->
+  <style>
+    :root {
+      --ios-blur: 30px;
+      --ios-icon-size: 60px;
+      --ios-dock-height: 90px;
+    }
+
+    body {
+      background-color: #000;
+      color: white;
+      margin: 0;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none; /* Prevent pull-to-refresh on mobile */
+    }
+
+    /* Apple's continuous curve (Superellipse) simulation */
+    .squircle {
+      clip-path: inset(0% round 22.5%);
+    }
+
+    /* Hide scrollbar */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* SortableJS Ghost/Drag styles */
+    .sortable-ghost {
+      opacity: 0.4;
+      transform: scale(0.9);
+    }
+    .sortable-drag {
+      opacity: 1 !important;
+      transform: scale(1.1) !important;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Custom Utility Classes (Replacing Tailwind v3 arbitrary values) */
+    .h-screen-dvh { height: 100vh; height: 100dvh; }
+    .backdrop-blur-ios { backdrop-filter: blur(var(--ios-blur)); -webkit-backdrop-filter: blur(var(--ios-blur)); }
+    .backdrop-blur-md { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    .backdrop-blur-xl { backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+    .backdrop-blur-3xl { backdrop-filter: blur(64px); -webkit-backdrop-filter: blur(64px); }
+    
+    .text-15px { font-size: 15px; }
+    .text-10px { font-size: 10px; }
+    .w-120px { width: 120px; }
+    .h-32px { height: 32px; }
+    
+    .bg-black-10 { background-color: rgba(0, 0, 0, 0.1); }
+    .bg-black-40 { background-color: rgba(0, 0, 0, 0.4); }
+    .bg-white-10 { background-color: rgba(255, 255, 255, 0.1); }
+    .bg-white-20 { background-color: rgba(255, 255, 255, 0.2); }
+    .bg-white-50 { background-color: rgba(255, 255, 255, 0.5); }
+    .bg-white-80 { background-color: rgba(255, 255, 255, 0.8); }
+    .bg-gray-200-80 { background-color: rgba(229, 231, 235, 0.8); }
+    
+    .border-white-10 { border-color: rgba(255, 255, 255, 0.1); }
+    .border-white-20 { border-color: rgba(255, 255, 255, 0.2); }
+    .border-white-30 { border-color: rgba(255, 255, 255, 0.3); }
+    
+    .text-white-60 { color: rgba(255, 255, 255, 0.6); }
+    .text-white-80 { color: rgba(255, 255, 255, 0.8); }
+    
+    .w-ios-icon { width: var(--ios-icon-size); }
+    .h-ios-icon { height: var(--ios-icon-size); }
+    .h-ios-dock { height: var(--ios-dock-height); }
+    .h-main-grid { height: calc(100% - var(--ios-dock-height) - 20px); }
+
+    /* Jiggle Animations */
+    .animate-jiggle { animation: jiggle 0.3s infinite linear; }
+    .animate-jiggle-reverse { animation: jiggle-reverse 0.3s infinite linear; }
+    @keyframes jiggle {
+      0%, 100% { transform: rotate(-1deg) scale(0.95); }
+      50% { transform: rotate(1deg) scale(0.95); }
+    }
+    @keyframes jiggle-reverse {
+      0%, 100% { transform: rotate(1deg) scale(0.95); }
+      50% { transform: rotate(-1deg) scale(0.95); }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app" class="relative w-full h-screen-dvh overflow-hidden bg-black" @click="stopJiggle">
+    
+    <!-- Wallpaper -->
+    <div class="absolute inset-0 z-0 bg-cover bg-center transition-transform duration-700 ease-out"
+         :style="{ backgroundImage: 'url(https://picsum.photos/seed/ios20/1080/2400)', transform: isJiggling ? 'scale(1.02)' : 'scale(1)' }">
+    </div>
+    
+    <!-- Glassmorphism Overlay -->
+    <div class="absolute inset-0 z-0 bg-black-10 backdrop-blur-ios pointer-events-none"></div>
+
+    <!-- Status Bar -->
+    <div class="absolute top-0 left-0 right-0 h-14 z-50 flex items-center justify-between px-6 text-white font-semibold text-15px pointer-events-none">
+      <div class="w-1/3 flex justify-start">{{ formattedTime }}</div>
+      
+      <!-- Dynamic Island -->
+      <div class="w-1/3 flex justify-center">
+        <div class="w-120px h-32px bg-black rounded-full squircle flex items-center justify-between px-2 shadow-sm">
+          <div class="w-2 h-2 bg-green-500 rounded-full opacity-80"></div>
+          <div class="w-2 h-2 bg-gray-800 rounded-full"></div>
+        </div>
+      </div>
+
+      <div class="w-1/3 flex justify-end items-center gap-1.5">
+        <lucide-icon name="Signal" size="16" class="fill-current"></lucide-icon>
+        <lucide-icon name="Wifi" size="16"></lucide-icon>
+        <div class="flex items-center gap-1">
+          <span class="text-xs">100%</span>
+          <lucide-icon name="Battery" size="20" class="fill-current"></lucide-icon>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Grid Area -->
+    <div class="relative z-10 pt-20 px-6 h-main-grid overflow-y-auto pb-10" 
+         @pointerdown="startLongPress" 
+         @pointerup="cancelLongPress" 
+         @pointerleave="cancelLongPress">
+      
+      <div id="sortable-grid" class="grid gap-4" 
+           style="grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(var(--ios-icon-size), auto); grid-auto-flow: dense;">
+        
+        <div v-for="item in items" :key="item.id" :data-id="item.id"
+             :class="['relative flex justify-center items-start', getGridSpan(item.type), isJiggling ? (item.id.length % 2 === 0 ? 'animate-jiggle' : 'animate-jiggle-reverse') : '']">
+          
+          <!-- Delete Button (Only visible when jiggling) -->
+          <button v-if="isJiggling" @click.stop="deleteItem(item.id)" 
+                  class="absolute -top-2 -left-2 z-20 bg-gray-200-80 backdrop-blur-md text-black rounded-full p-0.5 shadow-sm">
+            <lucide-icon name="Minus" size="14"></lucide-icon>
+          </button>
+
+          <!-- Standard App Icon -->
+          <div v-if="item.type === 'app'" class="flex flex-col items-center gap-1 w-ios-icon">
+            <div :class="['w-ios-icon h-ios-icon squircle flex items-center justify-center text-white shadow-sm', item.color]">
+              <lucide-icon :name="item.icon" size="32"></lucide-icon>
+            </div>
+            <span class="text-white text-xs font-medium tracking-wide drop-shadow-md truncate w-full text-center">{{ item.title }}</span>
+          </div>
+
+          <!-- 2x2 Clock Widget -->
+          <div v-else-if="item.type === 'widget-2x2'" class="w-full h-full bg-white-10 backdrop-blur-xl squircle border border-white-20 flex items-center justify-center p-4 pointer-events-none">
+            <div class="relative w-full h-full rounded-full border-2 border-white-30 flex items-center justify-center">
+              <div v-for="i in 12" :key="i" class="absolute w-1 h-2 bg-white-50 rounded-full" :style="{ transform: `rotate(${i * 30}deg) translateY(-28px)` }"></div>
+              <div class="absolute w-1 h-8 bg-white rounded-full origin-bottom" :style="{ transform: `translateY(-50%) rotate(${hours * 30 + minutes * 0.5}deg)` }"></div>
+              <div class="absolute w-0.5 h-12 bg-white-80 rounded-full origin-bottom" :style="{ transform: `translateY(-50%) rotate(${minutes * 6}deg)` }"></div>
+              <div class="absolute w-0.5 h-14 bg-orange-500 rounded-full origin-bottom" :style="{ transform: `translateY(-50%) rotate(${seconds * 6}deg)` }"></div>
+              <div class="absolute w-2 h-2 bg-orange-500 rounded-full"></div>
+            </div>
+          </div>
+
+          <!-- 2x4 System Info Widget -->
+          <div v-else-if="item.type === 'widget-4x2'" class="w-full h-full bg-black-40 backdrop-blur-xl squircle border border-white-10 p-4 flex flex-col justify-between pointer-events-none">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 text-white-80">
+                <lucide-icon name="Activity" size="16"></lucide-icon>
+                <span class="text-xs font-semibold uppercase tracking-wider">System</span>
+              </div>
+              <span class="text-xs text-green-400 font-mono">Good</span>
+            </div>
+            <div class="flex gap-4 h-full mt-3">
+              <div class="flex-1 flex flex-col justify-end gap-1">
+                <div class="flex justify-between text-10px text-white-60"><span>CPU</span><span>34%</span></div>
+                <div class="w-full h-1.5 bg-white-10 rounded-full overflow-hidden"><div class="h-full bg-blue-500" style="width: 34%;"></div></div>
+              </div>
+              <div class="flex-1 flex flex-col justify-end gap-1">
+                <div class="flex justify-between text-10px text-white-60"><span>RAM</span><span>68%</span></div>
+                <div class="w-full h-1.5 bg-white-10 rounded-full overflow-hidden"><div class="h-full bg-orange-500" style="width: 68%;"></div></div>
+              </div>
+              <div class="flex-1 flex flex-col justify-end gap-1">
+                <div class="flex justify-between text-10px text-white-60"><span>BAT</span><span>100%</span></div>
+                <div class="w-full h-1.5 bg-white-10 rounded-full overflow-hidden"><div class="h-full bg-green-500" style="width: 100%;"></div></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Dock -->
+    <div class="absolute bottom-4 left-4 right-4 h-ios-dock z-20">
+      <div class="w-full h-full bg-white-20 backdrop-blur-3xl squircle border-t border-white-30 shadow-lg flex items-center justify-around px-4">
+        <div v-for="item in dockItems" :key="item.id" 
+             :class="['flex flex-col items-center gap-1 w-ios-icon', isJiggling ? (item.id.length % 2 === 0 ? 'animate-jiggle' : 'animate-jiggle-reverse') : '']">
+          <div :class="['w-ios-icon h-ios-icon squircle flex items-center justify-center text-white shadow-sm', item.color]">
+            <lucide-icon :name="item.icon" size="32"></lucide-icon>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Home Indicator -->
+    <div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1/3 h-1 bg-white rounded-full z-50 opacity-80"></div>
+  </div>
+
+  <!-- Application Logic -->
+  <script>
+    // Wrap everything in window.onload to ensure stability and prevent white screens
+    window.onload = () => {
+      const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+      // Component to render Lucide Icons dynamically in Vue
+      const LucideIcon = {
+        props: ['name', 'size', 'class'],
+        computed: {
+          svgContent() {
+            const icon = lucide.icons[this.name];
+            if (!icon) return '';
+            return icon.toSvg({
+              width: this.size || 24,
+              height: this.size || 24,
+              class: this.class || '',
+              'stroke-width': 1.5
+            });
+          }
+        },
+        template: `<div v-html="svgContent" class="flex items-center justify-center"></div>`
+      };
+
+      const INITIAL_ITEMS = [
+        { id: 'w-clock', type: 'widget-2x2', title: 'Clock' },
+        { id: 'w-sys', type: 'widget-4x2', title: 'System' },
+        { id: 'app-1', type: 'app', title: 'Messages', icon: 'MessageCircle', color: 'bg-green-500' },
+        { id: 'app-2', type: 'app', title: 'Calendar', icon: 'Calendar', color: 'bg-red-500' },
+        { id: 'app-3', type: 'app', title: 'Photos', icon: 'Camera', color: 'bg-blue-400' },
+        { id: 'app-4', type: 'app', title: 'Camera', icon: 'Camera', color: 'bg-gray-800' },
+        { id: 'app-5', type: 'app', title: 'Weather', icon: 'Cloud', color: 'bg-blue-500' },
+        { id: 'app-6', type: 'app', title: 'Clock', icon: 'Clock', color: 'bg-black' },
+        { id: 'app-7', type: 'app', title: 'Maps', icon: 'Map', color: 'bg-green-600' },
+        { id: 'app-8', type: 'app', title: 'Settings', icon: 'Settings', color: 'bg-gray-600' },
+        { id: 'app-9', type: 'app', title: 'Calculator', icon: 'Calculator', color: 'bg-orange-500' },
+      ];
+
+      const INITIAL_DOCK = [
+        { id: 'dock-1', type: 'app', title: 'Phone', icon: 'Phone', color: 'bg-green-500' },
+        { id: 'dock-2', type: 'app', title: 'Mail', icon: 'Mail', color: 'bg-blue-500' },
+        { id: 'dock-3', type: 'app', title: 'Music', icon: 'Music', color: 'bg-rose-500' },
+        { id: 'dock-4', type: 'app', title: 'Safari', icon: 'Compass', color: 'bg-blue-400' },
+      ];
+
+      const app = createApp({
+        components: {
+          'lucide-icon': LucideIcon
+        },
+        setup() {
+          const items = ref([]);
+          const dockItems = ref(INITIAL_DOCK);
+          const isJiggling = ref(false);
+          const time = ref(new Date());
+          
+          let longPressTimer = null;
+          let sortableInstance = null;
+          let clockInterval = null;
+
+          // Clock Computations
+          const formattedTime = computed(() => {
+            let h = time.value.getHours();
+            let m = time.value.getMinutes();
+            h = h % 12 || 12;
+            m = m < 10 ? '0' + m : m;
+            return `${h}:${m}`;
+          });
+          const hours = computed(() => time.value.getHours());
+          const minutes = computed(() => time.value.getMinutes());
+          const seconds = computed(() => time.value.getSeconds());
+
+          // Grid Spanning for Widgets
+          const getGridSpan = (type) => {
+            if (type === 'widget-4x2') return 'col-span-4 row-span-2';
+            if (type === 'widget-2x2') return 'col-span-2 row-span-2';
+            return 'col-span-1 row-span-1';
+          };
+
+          // Long Press Logic (Enter Jiggle Mode)
+          const startLongPress = (e) => {
+            if (isJiggling.value) return;
+            longPressTimer = setTimeout(() => {
+              isJiggling.value = true;
+              if (navigator.vibrate) navigator.vibrate(50);
+              if (sortableInstance) sortableInstance.option('disabled', false);
+            }, 500);
+          };
+
+          const cancelLongPress = () => {
+            if (longPressTimer) clearTimeout(longPressTimer);
+          };
+
+          const stopJiggle = (e) => {
+            if (e.target.closest('button')) return; // Ignore if clicking delete button
+            isJiggling.value = false;
+            if (sortableInstance) sortableInstance.option('disabled', true);
+          };
+
+          // Delete & Save Logic
+          const deleteItem = (id) => {
+            items.value = items.value.filter(i => i.id !== id);
+            saveLayout();
+          };
+
+          const saveLayout = () => {
+            localStorage.setItem('ios20-layout', JSON.stringify(items.value));
+          };
+
+          const loadLayout = () => {
+            const saved = localStorage.getItem('ios20-layout');
+            if (saved) {
+              try {
+                items.value = JSON.parse(saved);
+              } catch (e) {
+                items.value = INITIAL_ITEMS;
+              }
+            } else {
+              items.value = INITIAL_ITEMS;
+            }
+          };
+
+          // Initialize SortableJS
+          const initSortable = () => {
+            const el = document.getElementById('sortable-grid');
+            sortableInstance = Sortable.create(el, {
+              animation: 250,
+              disabled: true, // Disabled until jiggle mode is active
+              ghostClass: 'sortable-ghost',
+              dragClass: 'sortable-drag',
+              delay: 100, // Slight delay to prevent accidental drags
+              delayOnTouchOnly: true,
+              onEnd: (evt) => {
+                const { oldIndex, newIndex } = evt;
+                if (oldIndex === newIndex) return;
+                
+                // 1. Undo the DOM mutation made by SortableJS to prevent Vue Virtual DOM conflicts
+                const itemEl = evt.item;
+                const parentEl = evt.to;
+                if (oldIndex < newIndex) {
+                  parentEl.insertBefore(itemEl, parentEl.children[oldIndex]);
+                } else {
+                  parentEl.insertBefore(itemEl, parentEl.children[oldIndex + 1]);
+                }
+                
+                // 2. Update the Vue reactive array
+                const movedItem = items.value.splice(oldIndex, 1)[0];
+                items.value.splice(newIndex, 0, movedItem);
+                
+                saveLayout();
+              }
+            });
+          };
+
+          onMounted(() => {
+            loadLayout();
+            clockInterval = setInterval(() => { time.value = new Date(); }, 1000);
+            
+            // Wait for Vue to render the grid before attaching SortableJS
+            setTimeout(() => {
+              initSortable();
+            }, 100);
+          });
+
+          onUnmounted(() => {
+            if (clockInterval) clearInterval(clockInterval);
+            if (sortableInstance) sortableInstance.destroy();
+          });
+
+          return {
+            items, dockItems, isJiggling,
+            formattedTime, hours, minutes, seconds,
+            getGridSpan, startLongPress, cancelLongPress, stopJiggle, deleteItem
+          };
+        }
+      });
+
+      app.mount('#app');
+    };
+  </script>
+</body>
+</html>
